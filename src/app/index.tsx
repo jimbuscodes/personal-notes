@@ -1,96 +1,155 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const [item, setItem] = useState("");
+  const [tasks, setTasks] = useState<string[]>([]);
+
+  function addItem() {
+    if (item.trim() === "") {
+      return;
+    }
+    setTasks([...tasks, item.trim()]);
+    setItem("");
+  }
+
+  function deleteItem(index: number) {
+    const newTasks = tasks.filter((item, itemIndex) => itemIndex !== index);
+    setTasks(newTasks);
+  }
+
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
+        <Text style={styles.title}>Todo List</Text>
+        <TextInput
+          style={styles.textInputStyle}
+          placeholder="Add a task..."
+          value={item}
+          onChangeText={setItem}
+        />
+        <Pressable style={styles.button} onPress={addItem}>
+          <Text style={styles.buttonText}>New Task</Text>
+        </Pressable>
+        <FlatList
+          style={styles.listContainer}
+          data={tasks}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item, index }) => (
+            <View
+              style={[
+                styles.taskItem,
+                colorScheme === "dark" && styles.darkTaskItem,
+              ]}
+            >
+              <Text style={styles.taskText}>{item}</Text>
+              <Pressable onPress={() => deleteItem(index)}>
+                <Text style={styles.deleteText}>X</Text>
+              </Pressable>
+            </View>
+          )}
+        />
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    justifyContent: "center",
+    flexDirection: "row",
   },
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.four,
-    alignItems: 'center',
+    alignItems: "center",
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
   },
+  title: {
+    color: "#45c6f1",
+    fontSize: 45,
+    fontFamily: "futura",
+    marginBottom: 20,
+    padding: 20,
+    textDecorationLine: "underline",
+  },
+  textInputStyle: {
+    color: "#45c6f1",
+    borderWidth: 1,
+    borderColor: "#45c6f1",
+    borderRadius: 15,
+    padding: 12,
+    width: "100%",
+  },
+  button: {
+    backgroundColor: "#1f8cb0",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "futura",
+  },
+  listContainer: {
+    width: "100%",
+  },
+  deleteText: {
+    color: "#fff",
+    marginLeft: 15,
+    fontSize: 16,
+    fontFamily: "futura",
+  },
+  taskItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    padding: 15,
+    backgroundColor: "#1f8cb0",
+    marginTop: 15,
+    borderRadius: 5,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+  },
+  darkTaskItem: {
+    boxShadow: "0px 2px 6px rgba(249, 246, 249, 0.65)",
+  },
+  taskText: {
+    fontFamily: "futura",
+    fontSize: 16,
+    color: "#fff",
+    textDecorationLine: "underline",
+  },
   heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flex: 1,
     paddingHorizontal: Spacing.four,
     gap: Spacing.four,
   },
-  title: {
-    textAlign: 'center',
-  },
+
   code: {
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   stepContainer: {
     gap: Spacing.three,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.four,
     borderRadius: Spacing.four,
