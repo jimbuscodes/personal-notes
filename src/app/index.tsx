@@ -1,6 +1,19 @@
-import { useState } from "react";
+import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { initializeApp } from "firebase/app";
+import type { User } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { useEffect, useState } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,58 +23,290 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+// firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyBN6ceHeYNnR6tYdM-gW_sAdLzo5-DN54I",
+  authDomain: "webdev-class-setup.firebaseapp.com",
+  projectId: "webdev-class-setup",
+  storageBucket: "webdev-class-setup.firebasestorage.app",
+  messagingSenderId: "187086770371",
+  appId: "1:187086770371:web:2737b950e7015cc0a4d276",
+  measurementId: "G-ST1HN1H3W9",
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+type Note = {
+  title: string;
+  text: string;
+};
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
-  const [item, setItem] = useState("");
-  const [tasks, setTasks] = useState<string[]>([]);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [note, setNote] = useState("");
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
+  const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
+    "create",
+  );
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [user, setUser] = useState<User | null>(null);
 
-  function addItem() {
-    if (item.trim() === "") {
-      return;
+  useEffect(() => {
+    const unSubscribe = onAuthStateChanged(auth, (currentUser) =>
+      setUser(currentUser),
+    );
+    return unSubscribe;
+  }, []);
+
+  const handleSignup = async () => {
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.log(error);
     }
-    setTasks([...tasks, item.trim()]);
-    setItem("");
+  };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setEmail("");
+      setPassword("");
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setEmail("");
+      setPassword("");
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loginContainer}>
+          <Text style={styles.loginTitle}>My Notes</Text>
+          <Text style={styles.loginSubtitle}>Login to continue...</Text>
+
+          <TextInput
+            style={styles.loginInput}
+            placeholder="Email"
+            placeholderTextColor={styles.loginPlaceholder.color}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          ></TextInput>
+
+          <TextInput
+            style={styles.loginInput}
+            placeholder="Password"
+            placeholderTextColor={styles.loginPlaceholder.color}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          ></TextInput>
+
+          <Pressable style={styles.loginButton} onPress={handleLogin}>
+            <Text style={styles.loginButtonText}>Sign in</Text>
+          </Pressable>
+
+          <Pressable style={styles.createAccountButton} onPress={handleSignup}>
+            <Text style={styles.createAccountButtonText}>Create Account</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  function deleteItem(index: number) {
-    const newTasks = tasks.filter((item, itemIndex) => itemIndex !== index);
-    setTasks(newTasks);
+  function saveNote() {
+    const trimmedTitle = noteTitle.trim();
+    const trimmedNote = note.trim();
+
+    if (trimmedTitle === "" || trimmedNote === "") {
+      return;
+    }
+
+    if (editingNoteIndex === null) {
+      setNotes([...notes, { title: trimmedTitle, text: trimmedNote }]);
+    } else {
+      setNotes(
+        notes.map((existingNote, index) =>
+          index === editingNoteIndex
+            ? { title: trimmedTitle, text: trimmedNote }
+            : existingNote,
+        ),
+      );
+    }
+
+    closeNoteModal();
+  }
+
+  function openNoteModal() {
+    setModalMode("create");
+    setEditingNoteIndex(null);
+    setNoteTitle("");
+    setNote("");
+    setIsModalVisible(true);
+  }
+
+  function openEditModal(index: number) {
+    setModalMode("edit");
+    setEditingNoteIndex(index);
+    setNoteTitle(notes[index].title);
+    setNote(notes[index].text);
+    setIsModalVisible(true);
+  }
+
+  function openViewModal(index: number) {
+    setModalMode("view");
+    setEditingNoteIndex(index);
+    setNoteTitle(notes[index].title);
+    setNote(notes[index].text);
+    setIsModalVisible(true);
+  }
+
+  function closeNoteModal() {
+    setIsModalVisible(false);
+    setNoteTitle("");
+    setNote("");
+    setEditingNoteIndex(null);
+    setModalMode("create");
+  }
+
+  function deleteNote(index: number) {
+    const newNotes = notes.filter((item, itemIndex) => itemIndex !== index);
+    setNotes(newNotes);
   }
 
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.title}>Todo List</Text>
-        <TextInput
-          style={styles.textInputStyle}
-          placeholder="Add a task..."
-          value={item}
-          onChangeText={setItem}
-        />
-        <Pressable style={styles.button} onPress={addItem}>
-          <Text style={styles.buttonText}>New Task</Text>
+        <View style={styles.heroSection}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Personal</Text>
+            <Text style={styles.title}>Notes</Text>
+          </View>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text>Logout</Text>
+          </Pressable>
+        </View>
+        <Pressable style={styles.button} onPress={openNoteModal}>
+          <Text style={styles.buttonText}>New Note</Text>
         </Pressable>
         <FlatList
           style={styles.listContainer}
-          data={tasks}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item, index }) => (
+          data={notes}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={({ item: note, index }) => (
             <View
               style={[
-                styles.taskItem,
-                colorScheme === "dark" && styles.darkTaskItem,
+                styles.noteItem,
+                colorScheme === "dark" && styles.darkNoteItem,
               ]}
             >
-              <Text style={styles.taskText}>{item}</Text>
-              <Pressable onPress={() => deleteItem(index)}>
-                <Text style={styles.deleteText}>X</Text>
+              <Pressable
+                style={styles.noteContent}
+                onPress={() => openViewModal(index)}
+              >
+                <Text style={styles.noteTitle}>{note.title}</Text>
+                <Text style={styles.notePreview} numberOfLines={2}>
+                  {note.text}
+                </Text>
               </Pressable>
+              <View style={styles.noteActions}>
+                <Pressable
+                  style={styles.editButton}
+                  onPress={() => openEditModal(index)}
+                >
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.deleteButton}
+                  onPress={() => deleteNote(index)}
+                >
+                  <Text style={styles.deleteText}>X</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         />
       </SafeAreaView>
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeNoteModal}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {modalMode === "create"
+                ? "New Note"
+                : modalMode === "edit"
+                  ? "Edit Note"
+                  : noteTitle}
+            </Text>
+
+            {modalMode === "view" ? (
+              <Text style={styles.fullNoteText}>{note}</Text>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.noteTitleInput}
+                  placeholder="Note title"
+                  placeholderTextColor="#9aa3b2"
+                  value={noteTitle}
+                  onChangeText={setNoteTitle}
+                  autoFocus
+                />
+                <TextInput
+                  style={styles.noteInput}
+                  placeholder="Write your note..."
+                  placeholderTextColor="#9aa3b2"
+                  value={note}
+                  onChangeText={setNote}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </>
+            )}
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={closeNoteModal}
+              >
+                <Text style={styles.cancelButtonText}>
+                  {modalMode === "view" ? "Close" : "Cancel"}
+                </Text>
+              </Pressable>
+
+              {modalMode !== "view" && (
+                <Pressable style={styles.saveButton} onPress={saveNote}>
+                  <Text style={styles.saveButtonText}>
+                    {modalMode === "create" ? "Save Note" : "Save Changes"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -79,28 +324,51 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
+    backgroundColor: "#f8f8f8",
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  titleContainer: {
+    flexDirection: "column",
+    alignItems: "flex-start",
   },
   title: {
-    color: "#45c6f1",
+    color: "#222",
     fontSize: 45,
     fontFamily: "futura",
-    marginBottom: 20,
-    padding: 20,
+    paddingLeft: 20,
     textDecorationLine: "underline",
   },
   textInputStyle: {
-    color: "#45c6f1",
+    color: "#222",
     borderWidth: 1,
-    borderColor: "#45c6f1",
+    borderColor: "#222",
     borderRadius: 15,
     padding: 12,
     width: "100%",
   },
   button: {
-    backgroundColor: "#1f8cb0",
-    padding: 12,
+    backgroundColor: "#222",
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
     borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: 10,
+    marginLeft: 10,
+    marginRight: 10,
+  },
+  logoutButton: {
+    backgroundColor: "#d55",
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 5,
+    paddingBottom: 5,
+    borderRadius: 5,
+    marginBottom: 5,
+    position: "absolute",
+    right: 0,
+    bottom: 40,
   },
   buttonText: {
     color: "#fff",
@@ -112,36 +380,130 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     color: "#fff",
-    marginLeft: 15,
     fontSize: 16,
     fontFamily: "futura",
   },
-  taskItem: {
+  deleteButton: {
+    padding: 6,
+  },
+  noteActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexShrink: 0,
+  },
+  editButton: {
+    backgroundColor: "#d55",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  editText: {
+    color: "#222",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  noteItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
     padding: 15,
-    backgroundColor: "#1f8cb0",
+    backgroundColor: "#222",
     marginTop: 15,
     borderRadius: 5,
     boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
   },
-  darkTaskItem: {
+  darkNoteItem: {
+    backgroundColor: "#333",
     boxShadow: "0px 2px 6px rgba(249, 246, 249, 0.65)",
   },
-  taskText: {
+  noteContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  noteTitle: {
     fontFamily: "futura",
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: "700",
     color: "#fff",
-    textDecorationLine: "underline",
+  },
+  notePreview: {
+    fontFamily: "futura",
+    fontSize: 14,
+    color: "#fff",
+    marginTop: 4,
+    opacity: 0.75,
+  },
+  noteTitleInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#222",
+    marginBottom: 12,
+  },
+  fullNoteText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: "#222",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    padding: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  noteInput: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#222",
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 16,
+  },
+  cancelButton: {
+    padding: 12,
+  },
+  cancelButtonText: {
+    color: "#222",
+    fontWeight: "bold",
+  },
+  saveButton: {
+    backgroundColor: "#222",
+    padding: 12,
+    borderRadius: 8,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   heroSection: {
+    display: "flex",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: "space-between",
+    width: "100%",
+    position: "relative",
   },
 
   code: {
@@ -153,5 +515,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.four,
     borderRadius: Spacing.four,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  loginTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    color: "#668",
+    marginBottom: 24,
+  },
+  loginInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    marginBottom: 16,
+    color: "#668",
+  },
+  loginPlaceholder: {
+    color: "#9aa3b2",
+  },
+  loginButton: {
+    backgroundColor: "#222",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  createAccountButton: {
+    backgroundColor: "#d55",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 12,
+    marginLeft: 10,
+  },
+  createAccountButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
