@@ -36,15 +36,42 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// firebase config
+function requiredFirebaseEnv(value: string | undefined, name: string) {
+  if (!value) {
+    throw new Error(`Missing required Firebase environment variable: ${name}`);
+  }
+  return value;
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBN6ceHeYNnR6tYdM-gW_sAdLzo5-DN54I",
-  authDomain: "webdev-class-setup.firebaseapp.com",
-  projectId: "webdev-class-setup",
-  storageBucket: "webdev-class-setup.firebasestorage.app",
-  messagingSenderId: "187086770371",
-  appId: "1:187086770371:web:2737b950e7015cc0a4d276",
-  measurementId: "G-ST1HN1H3W9",
+  apiKey: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    "EXPO_PUBLIC_FIREBASE_API_KEY",
+  ),
+  authDomain: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
+  ),
+  projectId: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+    "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+  ),
+  storageBucket: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
+  ),
+  messagingSenderId: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+  ),
+  appId: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+    "EXPO_PUBLIC_FIREBASE_APP_ID",
+  ),
+  measurementId: requiredFirebaseEnv(
+    process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID",
+  ),
 };
 
 // Initialize Firebase

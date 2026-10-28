@@ -74,9 +74,13 @@ npm run ios
    Firestore **Rules** tab.
 
 The Firebase project configuration is initialized in
-[src/app/index.tsx](./src/app/index.tsx). Firebase web API keys are intended
-to be used in client applications, while access control is enforced by
-Authentication and Firestore Security Rules.
+[src/app/index.tsx](./src/app/index.tsx) from Expo public environment
+variables. Copy [.env.example](./.env.example) to `.env.local` and fill in the
+values from **Project settings → Your apps → Firebase SDK snippet**. The
+`.env.local` file is ignored by Git.
+
+Firebase web API keys are intended to be used in client applications, while
+access control is enforced by Authentication and Firestore Security Rules.
 
 ### Deploy Firestore rules with the CLI
 
