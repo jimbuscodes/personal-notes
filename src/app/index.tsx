@@ -866,7 +866,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 12,
+    width: "100%",
   },
   loginButtonText: {
     color: "#fff",
@@ -879,7 +881,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 12,
-    marginLeft: 10,
+    width: "100%",
   },
   createAccountButtonText: {
     color: "#fff",
