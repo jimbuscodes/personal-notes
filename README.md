@@ -79,6 +79,24 @@ variables. Copy [.env.example](./.env.example) to `.env.local` and fill in the
 values from **Project settings → Your apps → Firebase SDK snippet**. The
 `.env.local` file is ignored by Git.
 
+Required variables:
+
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+EXPO_PUBLIC_FIREBASE_APP_ID=your-firebase-app-id
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
+```
+
+Restart the Expo development server after creating or changing `.env.local`:
+
+```bash
+npm run start
+```
+
 Firebase web API keys are intended to be used in client applications, while
 access control is enforced by Authentication and Firestore Security Rules.
 
