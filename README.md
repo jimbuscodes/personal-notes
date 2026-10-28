@@ -1,56 +1,119 @@
-# Welcome to your Expo app 👋
+# Personal Notes
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo and React Native notes application with Firebase Authentication and
+user-scoped Cloud Firestore storage.
 
-## Get started
+## Features
 
-1. Install dependencies
+- Email/password account creation and sign-in
+- Sign out
+- Create notes with a title and content
+- View the full note in a modal
+- Edit and delete notes
+- Mark notes as favorites
+- Filter between all notes and favorite notes
+- Display the total number of notes
+- Display each note's creation date
+- Live synchronization with Cloud Firestore
+- Firestore rules that restrict notes to their authenticated owner
 
-   ```bash
-   npm install
-   ```
+## Tech stack
 
-2. Start the app
+- Expo SDK 58
+- React Native
+- Expo Router
+- TypeScript
+- Firebase Authentication
+- Cloud Firestore
 
-   ```bash
-   npx expo start
-   ```
+## Requirements
 
-In the output, you'll find options to open the app in a
+- Node.js
+- An Expo-compatible device, simulator, or web browser
+- A Firebase project with:
+  - Email/password Authentication enabled
+  - Cloud Firestore enabled
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+The application is currently configured for the Firebase project
+`webdev-class-setup`.
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Install and run
 
-## Get a fresh project
-
-When you're ready, run:
+Install dependencies:
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Start the Expo development server:
 
-### Other setup steps
+```bash
+npm run start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Run on the web:
 
-## Learn more
+```bash
+npm run web
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Run on Android or iOS:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm run android
+npm run ios
+```
 
-## Join the community
+## Firebase setup
 
-Join our community of developers creating universal apps.
+1. Open the `webdev-class-setup` project in the
+   [Firebase Console](https://console.firebase.google.com/).
+2. Enable **Authentication → Sign-in method → Email/Password**.
+3. Create a **Cloud Firestore** database.
+4. Publish the rules from [firestore.rules](./firestore.rules) in the
+   Firestore **Rules** tab.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The Firebase project configuration is initialized in
+[src/app/index.tsx](./src/app/index.tsx). Firebase web API keys are intended
+to be used in client applications, while access control is enforced by
+Authentication and Firestore Security Rules.
+
+### Deploy Firestore rules with the CLI
+
+The repository includes [.firebaserc](./.firebaserc) and
+[firebase.json](./firebase.json), so the rules can also be deployed with:
+
+```bash
+npm install --global firebase-tools
+firebase login
+firebase deploy --only firestore:rules
+```
+
+## Firestore data model
+
+Notes are stored in the `notes` collection. Each document contains:
+
+```text
+title      string
+content    string
+favorite   boolean
+userId     string
+createdAt  timestamp
+```
+
+Every read is filtered by the authenticated user's UID. The rules also verify
+ownership for reads, creates, updates, and deletes.
+
+## Validation
+
+Run the TypeScript check:
+
+```bash
+npx tsc --noEmit
+```
+
+Build the web export:
+
+```bash
+npx expo export --platform web
+```
