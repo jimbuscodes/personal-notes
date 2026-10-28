@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   deleteText: {
-    color: "#fff",
+    color: "#222",
     fontSize: 16,
     fontFamily: "futura",
   },
