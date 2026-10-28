@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   favoriteText: {
-    color: "#fff",
+    color: "#222",
     fontSize: 24,
     lineHeight: 26,
   },
