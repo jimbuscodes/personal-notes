@@ -41,6 +41,7 @@ const auth = getAuth(app);
 type Note = {
   title: string;
   text: string;
+  favorite: boolean;
 };
 
 export default function HomeScreen() {
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   const [noteTitle, setNoteTitle] = useState("");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState<Note[]>([]);
+  const [noteFilter, setNoteFilter] = useState<"all" | "favorites">("all");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "edit" | "view">(
@@ -139,12 +141,15 @@ export default function HomeScreen() {
     }
 
     if (editingNoteIndex === null) {
-      setNotes([...notes, { title: trimmedTitle, text: trimmedNote }]);
+      setNotes([
+        ...notes,
+        { title: trimmedTitle, text: trimmedNote, favorite: false },
+      ]);
     } else {
       setNotes(
         notes.map((existingNote, index) =>
           index === editingNoteIndex
-            ? { title: trimmedTitle, text: trimmedNote }
+            ? { ...existingNote, title: trimmedTitle, text: trimmedNote }
             : existingNote,
         ),
       );
@@ -190,6 +195,19 @@ export default function HomeScreen() {
     setNotes(newNotes);
   }
 
+  function toggleFavorite(index: number) {
+    setNotes(
+      notes.map((existingNote, noteIndex) =>
+        noteIndex === index
+          ? { ...existingNote, favorite: !existingNote.favorite }
+          : existingNote,
+      ),
+    );
+  }
+
+  const visibleNotes =
+    noteFilter === "favorites" ? notes.filter((item) => item.favorite) : notes;
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -205,11 +223,50 @@ export default function HomeScreen() {
         <Pressable style={styles.button} onPress={openNoteModal}>
           <Text style={styles.buttonText}>New Note</Text>
         </Pressable>
+        <View style={styles.notesHeader}>
+          <Text style={styles.notesCount}>
+            {notes.length} {notes.length === 1 ? "note" : "notes"}
+          </Text>
+          <View style={styles.filterActions}>
+            <Pressable
+              style={[
+                styles.filterButton,
+                noteFilter === "all" && styles.activeFilterButton,
+              ]}
+              onPress={() => setNoteFilter("all")}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  noteFilter === "all" && styles.activeFilterText,
+                ]}
+              >
+                All
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.filterButton,
+                noteFilter === "favorites" && styles.activeFilterButton,
+              ]}
+              onPress={() => setNoteFilter("favorites")}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  noteFilter === "favorites" && styles.activeFilterText,
+                ]}
+              >
+                Favorites
+              </Text>
+            </Pressable>
+          </View>
+        </View>
         <FlatList
           style={styles.listContainer}
-          data={notes}
-          keyExtractor={(_, index) => index.toString()}
-          renderItem={({ item: note, index }) => (
+          data={visibleNotes}
+          keyExtractor={(item) => `${item.title}-${item.text}`}
+          renderItem={({ item: note }) => (
             <View
               style={[
                 styles.noteItem,
@@ -218,7 +275,7 @@ export default function HomeScreen() {
             >
               <Pressable
                 style={styles.noteContent}
-                onPress={() => openViewModal(index)}
+                onPress={() => openViewModal(notes.indexOf(note))}
               >
                 <Text style={styles.noteTitle}>{note.title}</Text>
                 <Text style={styles.notePreview} numberOfLines={2}>
@@ -227,14 +284,32 @@ export default function HomeScreen() {
               </Pressable>
               <View style={styles.noteActions}>
                 <Pressable
+                  style={styles.favoriteButton}
+                  onPress={() => toggleFavorite(notes.indexOf(note))}
+                  accessibilityLabel={
+                    note.favorite
+                      ? "Remove note from favorites"
+                      : "Add note to favorites"
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.favoriteText,
+                      note.favorite && styles.favoriteTextActive,
+                    ]}
+                  >
+                    {note.favorite ? "★" : "☆"}
+                  </Text>
+                </Pressable>
+                <Pressable
                   style={styles.editButton}
-                  onPress={() => openEditModal(index)}
+                  onPress={() => openEditModal(notes.indexOf(note))}
                 >
                   <Text style={styles.editText}>Edit</Text>
                 </Pressable>
                 <Pressable
                   style={styles.deleteButton}
-                  onPress={() => deleteNote(index)}
+                  onPress={() => deleteNote(notes.indexOf(note))}
                 >
                   <Text style={styles.deleteText}>X</Text>
                 </Pressable>
@@ -287,10 +362,7 @@ export default function HomeScreen() {
             )}
 
             <View style={styles.modalActions}>
-              <Pressable
-                style={styles.cancelButton}
-                onPress={closeNoteModal}
-              >
+              <Pressable style={styles.cancelButton} onPress={closeNoteModal}>
                 <Text style={styles.cancelButtonText}>
                   {modalMode === "view" ? "Close" : "Cancel"}
                 </Text>
@@ -354,7 +426,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 20,
     marginLeft: 10,
     marginRight: 10,
   },
@@ -378,6 +450,39 @@ const styles = StyleSheet.create({
   listContainer: {
     width: "100%",
   },
+  notesHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  notesCount: {
+    color: "#666",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  filterActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "#e5e5e5",
+  },
+  activeFilterButton: {
+    backgroundColor: "#222",
+  },
+  filterText: {
+    color: "#555",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  activeFilterText: {
+    color: "#fff",
+  },
   deleteText: {
     color: "#fff",
     fontSize: 16,
@@ -389,8 +494,19 @@ const styles = StyleSheet.create({
   noteActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
     flexShrink: 0,
+  },
+  favoriteButton: {
+    padding: 4,
+  },
+  favoriteText: {
+    color: "#fff",
+    fontSize: 24,
+    lineHeight: 26,
+  },
+  favoriteTextActive: {
+    color: "#ffd166",
   },
   editButton: {
     backgroundColor: "#d55",
