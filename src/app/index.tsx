@@ -8,6 +8,19 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getFirestore,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  type Timestamp,
+} from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   FlatList,
@@ -37,18 +50,44 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 type Note = {
+  id: string;
   title: string;
   text: string;
   favorite: boolean;
+  createdAt: Timestamp | null;
 };
+
+function formatNoteDate(createdAt: Timestamp | null) {
+  return createdAt ? createdAt.toDate().toLocaleDateString() : "Saving...";
+}
+
+function getFirestoreErrorMessage(error: unknown, fallback: string) {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return fallback;
+  }
+
+  switch (String(error.code)) {
+    case "permission-denied":
+      return "Firestore denied this request. Deploy firestore.rules and verify you are signed in.";
+    case "failed-precondition":
+      return "Firestore is not enabled for the webdev-class-setup project.";
+    case "unauthenticated":
+      return "Your session expired. Sign in again before saving.";
+    default:
+      return `${fallback} (${String(error.code)})`;
+  }
+}
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const [noteTitle, setNoteTitle] = useState("");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState<Note[]>([]);
+  const [notesError, setNotesError] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [noteFilter, setNoteFilter] = useState<"all" | "favorites">("all");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
@@ -65,6 +104,47 @@ export default function HomeScreen() {
     );
     return unSubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setNotes([]);
+      return;
+    }
+
+    setNotesError("");
+    const notesQuery = query(
+      collection(db, "notes"),
+      where("userId", "==", user.uid),
+    );
+
+    return onSnapshot(
+      notesQuery,
+      (snapshot) => {
+        const loadedNotes = snapshot.docs
+          .map((noteDocument) => {
+            const data = noteDocument.data();
+            return {
+              id: noteDocument.id,
+              title: String(data.title ?? ""),
+              text: String(data.content ?? ""),
+              favorite: data.favorite === true,
+              createdAt: (data.createdAt as Timestamp | null) ?? null,
+            };
+          })
+          .sort(
+            (first, second) =>
+              (second.createdAt?.toMillis() ?? 0) -
+              (first.createdAt?.toMillis() ?? 0),
+          );
+        setNotes(loadedNotes);
+      },
+      (error) => {
+        setNotesError(
+          getFirestoreErrorMessage(error, "Unable to load your notes."),
+        );
+      },
+    );
+  }, [user]);
 
   const handleSignup = async () => {
     try {
@@ -132,33 +212,65 @@ export default function HomeScreen() {
     );
   }
 
-  function saveNote() {
+  async function saveNote() {
     const trimmedTitle = noteTitle.trim();
     const trimmedNote = note.trim();
 
-    if (trimmedTitle === "" || trimmedNote === "") {
+    if (!user) {
+      setNotesError("You must be signed in to save a note.");
       return;
     }
 
-    if (editingNoteIndex === null) {
-      setNotes([
-        ...notes,
-        { title: trimmedTitle, text: trimmedNote, favorite: false },
-      ]);
-    } else {
-      setNotes(
-        notes.map((existingNote, index) =>
-          index === editingNoteIndex
-            ? { ...existingNote, title: trimmedTitle, text: trimmedNote }
-            : existingNote,
-        ),
-      );
+    if (trimmedTitle === "" || trimmedNote === "") {
+      setNotesError("Enter both a note title and note content.");
+      return;
     }
 
+    setNotesError("");
+    setIsSavingNote(true);
+
+    if (editingNoteIndex === null) {
+      try {
+        await addDoc(collection(db, "notes"), {
+          title: trimmedTitle,
+          content: trimmedNote,
+          favorite: false,
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+        });
+      } catch (error) {
+        setNotesError(
+          getFirestoreErrorMessage(error, "Unable to save the note."),
+        );
+        setIsSavingNote(false);
+        return;
+      }
+    } else {
+      const existingNote = notes[editingNoteIndex];
+      if (!existingNote) {
+        return;
+      }
+
+      try {
+        await updateDoc(doc(db, "notes", existingNote.id), {
+          title: trimmedTitle,
+          content: trimmedNote,
+        });
+      } catch (error) {
+        setNotesError(
+          getFirestoreErrorMessage(error, "Unable to update the note."),
+        );
+        setIsSavingNote(false);
+        return;
+      }
+    }
+
+    setIsSavingNote(false);
     closeNoteModal();
   }
 
   function openNoteModal() {
+    setNotesError("");
     setModalMode("create");
     setEditingNoteIndex(null);
     setNoteTitle("");
@@ -167,6 +279,7 @@ export default function HomeScreen() {
   }
 
   function openEditModal(index: number) {
+    setNotesError("");
     setModalMode("edit");
     setEditingNoteIndex(index);
     setNoteTitle(notes[index].title);
@@ -175,6 +288,7 @@ export default function HomeScreen() {
   }
 
   function openViewModal(index: number) {
+    setNotesError("");
     setModalMode("view");
     setEditingNoteIndex(index);
     setNoteTitle(notes[index].title);
@@ -184,25 +298,32 @@ export default function HomeScreen() {
 
   function closeNoteModal() {
     setIsModalVisible(false);
+    setIsSavingNote(false);
+    setNotesError("");
     setNoteTitle("");
     setNote("");
     setEditingNoteIndex(null);
     setModalMode("create");
   }
 
-  function deleteNote(index: number) {
-    const newNotes = notes.filter((item, itemIndex) => itemIndex !== index);
-    setNotes(newNotes);
+  async function deleteNote(noteId: string) {
+    try {
+      await deleteDoc(doc(db, "notes", noteId));
+    } catch (error) {
+      setNotesError(
+        getFirestoreErrorMessage(error, "Unable to delete the note."),
+      );
+    }
   }
 
-  function toggleFavorite(index: number) {
-    setNotes(
-      notes.map((existingNote, noteIndex) =>
-        noteIndex === index
-          ? { ...existingNote, favorite: !existingNote.favorite }
-          : existingNote,
-      ),
-    );
+  async function toggleFavorite(noteId: string, favorite: boolean) {
+    try {
+      await updateDoc(doc(db, "notes", noteId), { favorite: !favorite });
+    } catch (error) {
+      setNotesError(
+        getFirestoreErrorMessage(error, "Unable to update favorite status."),
+      );
+    }
   }
 
   const visibleNotes =
@@ -224,9 +345,10 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>New Note</Text>
         </Pressable>
         <View style={styles.notesHeader}>
-          <Text style={styles.notesCount}>
-            {notes.length} {notes.length === 1 ? "note" : "notes"}
-          </Text>
+          <View style={styles.notesCountBadge}>
+            <Text style={styles.notesCountLabel}>Total notes</Text>
+            <Text style={styles.notesCount}>{notes.length}</Text>
+          </View>
           <View style={styles.filterActions}>
             <Pressable
               style={[
@@ -262,10 +384,13 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
+        {notesError ? (
+          <Text style={styles.notesError}>{notesError}</Text>
+        ) : null}
         <FlatList
           style={styles.listContainer}
           data={visibleNotes}
-          keyExtractor={(item) => `${item.title}-${item.text}`}
+          keyExtractor={(item) => item.id}
           renderItem={({ item: note }) => (
             <View
               style={[
@@ -281,11 +406,14 @@ export default function HomeScreen() {
                 <Text style={styles.notePreview} numberOfLines={2}>
                   {note.text}
                 </Text>
+                <Text style={styles.noteDate}>
+                  {formatNoteDate(note.createdAt)}
+                </Text>
               </Pressable>
               <View style={styles.noteActions}>
                 <Pressable
                   style={styles.favoriteButton}
-                  onPress={() => toggleFavorite(notes.indexOf(note))}
+                  onPress={() => toggleFavorite(note.id, note.favorite)}
                   accessibilityLabel={
                     note.favorite
                       ? "Remove note from favorites"
@@ -309,7 +437,7 @@ export default function HomeScreen() {
                 </Pressable>
                 <Pressable
                   style={styles.deleteButton}
-                  onPress={() => deleteNote(notes.indexOf(note))}
+                  onPress={() => deleteNote(note.id)}
                 >
                   <Text style={styles.deleteText}>X</Text>
                 </Pressable>
@@ -361,17 +489,33 @@ export default function HomeScreen() {
               </>
             )}
 
+            {notesError ? (
+              <Text style={styles.modalError}>{notesError}</Text>
+            ) : null}
+
             <View style={styles.modalActions}>
-              <Pressable style={styles.cancelButton} onPress={closeNoteModal}>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={closeNoteModal}
+                disabled={isSavingNote}
+              >
                 <Text style={styles.cancelButtonText}>
                   {modalMode === "view" ? "Close" : "Cancel"}
                 </Text>
               </Pressable>
 
               {modalMode !== "view" && (
-                <Pressable style={styles.saveButton} onPress={saveNote}>
+                <Pressable
+                  style={styles.saveButton}
+                  onPress={saveNote}
+                  disabled={isSavingNote}
+                >
                   <Text style={styles.saveButtonText}>
-                    {modalMode === "create" ? "Save Note" : "Save Changes"}
+                    {isSavingNote
+                      ? "Saving..."
+                      : modalMode === "create"
+                        ? "Save Note"
+                        : "Save Changes"}
                   </Text>
                 </Pressable>
               )}
@@ -458,8 +602,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   notesCount: {
-    color: "#666",
+    color: "#222",
     fontSize: 14,
+    fontWeight: "700",
+  },
+  notesCountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "#e5e5e5",
+  },
+  notesCountLabel: {
+    color: "#666",
+    fontSize: 12,
     fontWeight: "600",
   },
   filterActions: {
@@ -525,13 +683,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
     padding: 15,
-    backgroundColor: "#222",
+    backgroundColor: "#fff",
     marginTop: 15,
     borderRadius: 5,
     boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
   },
   darkNoteItem: {
-    backgroundColor: "#333",
+    backgroundColor: "#fff",
     boxShadow: "0px 2px 6px rgba(249, 246, 249, 0.65)",
   },
   noteContent: {
@@ -542,14 +700,26 @@ const styles = StyleSheet.create({
     fontFamily: "futura",
     fontSize: 17,
     fontWeight: "700",
-    color: "#fff",
+    color: "#222",
   },
   notePreview: {
     fontFamily: "futura",
     fontSize: 14,
-    color: "#fff",
+    color: "#222",
     marginTop: 4,
     opacity: 0.75,
+  },
+  noteDate: {
+    fontSize: 11,
+    color: "#222",
+    marginTop: 6,
+    opacity: 0.6,
+  },
+  notesError: {
+    width: "100%",
+    color: "#b42318",
+    fontSize: 13,
+    marginBottom: 4,
   },
   noteTitleInput: {
     borderWidth: 1,
@@ -564,6 +734,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: "#222",
+  },
+  modalError: {
+    color: "#b42318",
+    fontSize: 13,
+    marginTop: 12,
   },
   modalOverlay: {
     flex: 1,
